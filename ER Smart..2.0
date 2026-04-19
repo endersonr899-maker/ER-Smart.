@@ -1,0 +1,200 @@
+import React, { useState, useEffect } from 'react';
+import { Trash2, Save, Plus, RefreshCw, DollarSign, Cloud, PieChart, List, Calendar } from 'lucide-react';
+
+export default function ERSmartControlFinalV8() {
+  const [budget, setBudget] = useState('100');
+  const [exchangeRate, setExchangeRate] = useState('48.1');
+  const [itemName, setItemName] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [unitPrice, setUnitPrice] = useState('');
+  const [totalCartUSD, setTotalCartUSD] = useState(0);
+  const [isCashea, setIsCashea] = useState(true);
+  const [casheaPercent, setCasheaPercent] = useState('40');
+  const [numCuotas, setNumCuotas] = useState('3');
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('er_smart_v8_history');
+    const savedBudget = localStorage.getItem('er_smart_v8_budget');
+    if (savedHistory) setHistory(JSON.parse(savedHistory));
+    if (savedBudget) setBudget(savedBudget);
+  }, []);
+
+  const handleBudgetChange = (val) => {
+    setBudget(val);
+    localStorage.setItem('er_smart_v8_budget', val);
+  };
+
+  const currentItemTotal = (parseFloat(quantity || 0) * parseFloat(unitPrice || 0));
+  const estimatedInitialUSD = isCashea ? (totalCartUSD * (parseFloat(casheaPercent) / 100)) : totalCartUSD;
+  const liveRemainingUSD = parseFloat(budget || 0) - estimatedInitialUSD;
+  const liveRemainingBS = (liveRemainingUSD * parseFloat(exchangeRate || 0));
+
+  const addItem = () => {
+    if (currentItemTotal <= 0) return;
+    setTotalCartUSD(prev => prev + currentItemTotal);
+    setItemName('');
+    setQuantity('1');
+    setUnitPrice('');
+  };
+
+  const finalizePurchase = () => {
+    if (totalCartUSD === 0) return;
+    const initialUSD = estimatedInitialUSD;
+    const newBudget = (parseFloat(budget) - initialUSD).toFixed(2);
+    setBudget(newBudget);
+    localStorage.setItem('er_smart_v8_budget', newBudget);
+
+    const today = new Date();
+    const cuotasDetalladas = [];
+    if(isCashea) {
+      for(let i=1; i<=parseInt(numCuotas); i++) {
+          const d = new Date();
+          d.setDate(today.getDate() + (i * 14));
+          cuotasDetalladas.push({
+            fecha: d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' }).toUpperCase(),
+            monto: ((totalCartUSD - initialUSD) / parseInt(numCuotas)).toFixed(2)
+          });
+      }
+    }
+
+    const newEntry = {
+      id: Date.now(),
+      totalUSD: totalCartUSD,
+      totalBS: (totalCartUSD * parseFloat(exchangeRate)).toLocaleString('es-VE'),
+      paidUSD: initialUSD,
+      paidBS: (initialUSD * parseFloat(exchangeRate)).toLocaleString('es-VE'),
+      isCashea,
+      initialPercent: casheaPercent,
+      numCuotas,
+      cuotasDetalladas,
+      date: today.toLocaleString('es-VE', { hour12: true, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    };
+    
+    const newHistory = [newEntry, ...history];
+    setHistory(newHistory);
+    localStorage.setItem('er_smart_v8_history', JSON.stringify(newHistory));
+    setTotalCartUSD(0);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#020202] text-white p-4 font-sans italic tracking-tighter">
+      <header className="flex justify-between items-center py-6">
+        <div>
+          <h1 className="text-4xl font-black italic text-white uppercase leading-none tracking-tighter">ER <span className="text-emerald-500">SMART.</span></h1>
+          <div className="flex items-center gap-1 mt-1 opacity-50"><Cloud size={8} className="text-blue-400"/><p className="text-[7px] font-bold tracking-[0.2em] uppercase italic">Cloud Sync V8.0</p></div>
+        </div>
+        <button onClick={() => {localStorage.clear(); window.location.reload();}} className="p-3 bg-white/5 rounded-2xl text-gray-500 hover:text-red-500 transition-all"><RefreshCw size={18} /></button>
+      </header>
+
+      <div className="max-w-md mx-auto space-y-5">
+        <div className="bg-[#0a0a0a] py-8 rounded-[2.5rem] border border-white/5 shadow-2xl text-center relative">
+            <p className="text-[10px] font-black text-gray-500 uppercase italic mb-1 tracking-widest">Saldo Disponible</p>
+            <div className={`text-6xl font-black italic transition-all ${liveRemainingUSD <= 0 ? 'text-red-500' : 'text-emerald-400'}`}>${liveRemainingUSD.toFixed(2)}</div>
+            <div className="flex justify-center items-center gap-2 mt-3">
+                <span className="text-[10px] font-bold text-gray-600 uppercase italic">Presupuesto: $</span>
+                <input type="number" value={budget} onChange={(e) => handleBudgetChange(e.target.value)} className="bg-white/5 border-b border-emerald-500/30 w-16 text-[11px] font-black text-white outline-none text-center"/>
+            </div>
+            <p className="text-[16px] font-black text-blue-400 uppercase mt-2 italic tracking-wider bg-blue-400/10 py-1 inline-block px-6 rounded-full border border-blue-400/20">
+                {liveRemainingBS.toLocaleString('es-VE', {minimumFractionDigits: 2})} BS
+            </p>
+        </div>
+
+        <div className="bg-[#0f0f0f] p-6 rounded-[3rem] border border-white/5 space-y-5 shadow-2xl">
+          <div className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/5">
+             <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                <DollarSign size={14} className="text-emerald-500"/>
+                <input type="number" value={exchangeRate} onChange={(e)=>setExchangeRate(e.target.value)} className="bg-transparent text-sm font-black text-blue-400 w-16 outline-none" />
+                <span className="text-[8px] text-gray-500 uppercase font-black italic">Tasa BCV</span>
+             </div>
+             <div className="flex items-center gap-2 bg-black/60 px-3 py-1 rounded-lg">
+                <span className={`text-[8px] font-black uppercase italic ${isCashea ? 'text-orange-500' : 'text-gray-700'}`}>CASHEA</span>
+                <button onClick={()=>setIsCashea(!isCashea)} className={`w-8 h-4 rounded-full p-1 transition-all ${isCashea?'bg-orange-600':'bg-gray-800'}`}><div className={`w-2 h-2 bg-white rounded-full transition-transform ${isCashea?'translate-x-4':''}`}/></button>
+             </div>
+          </div>
+
+          {isCashea && (
+            <div className="space-y-3 bg-orange-500/5 p-4 rounded-2xl border border-orange-500/10 animate-in fade-in zoom-in-95">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[8px] font-black text-orange-500 uppercase italic mb-1 flex items-center gap-1"><PieChart size={10}/> % Inicial</p>
+                  <select value={casheaPercent} onChange={(e)=>setCasheaPercent(e.target.value)} className="w-full bg-black text-[10px] font-black p-2 rounded-xl outline-none text-white border border-white/10 italic">
+                    {[60, 50, 40, 30, 20, 10].map(p => <option key={p} value={p}>{p}% Inicial</option>)}
+                  </select>
+                </div>
+                <div>
+                  <p className="text-[8px] font-black text-orange-500 uppercase italic mb-1 flex items-center gap-1"><List size={10}/> Cuotas</p>
+                  <select value={numCuotas} onChange={(e)=>setNumCuotas(e.target.value)} className="w-full bg-black text-[10px] font-black p-2 rounded-xl outline-none text-white border border-white/10 italic">
+                    {[2, 3, 6, 9, 12].map(c => <option key={c} value={c}>{c} Cuotas</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="bg-black/40 p-3 rounded-xl border border-white/5 text-center">
+                  <p className="text-[8px] font-black text-gray-500 uppercase italic mb-1">Monto de Inicial a Pagar:</p>
+                  <div className="flex justify-center items-center gap-3">
+                      <p className="text-xl font-black text-white italic">${estimatedInitialUSD.toFixed(2)}</p>
+                      <p className="text-[14px] font-black text-blue-400 italic">{(estimatedInitialUSD * parseFloat(exchangeRate)).toLocaleString('es-VE')} BS</p>
+                  </div>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <input type="text" placeholder="¿QUÉ VAS A COMPRAR?" value={itemName} onChange={(e)=>setItemName(e.target.value)} className="w-full bg-[#151515] p-4 rounded-2xl border border-white/5 outline-none font-black uppercase text-[10px] text-white italic" />
+            <div className="grid grid-cols-2 gap-3">
+                <div className="bg-[#151515] p-2 rounded-2xl border border-white/5 text-center"><p className="text-[8px] font-black text-gray-600 uppercase italic mb-1">CANTIDAD</p><input type="number" value={quantity} onChange={(e)=>setQuantity(e.target.value)} className="w-full bg-transparent text-xl font-black outline-none text-white text-center"/></div>
+                <div className="bg-[#151515] p-2 rounded-2xl border border-white/5 text-center"><p className="text-[8px] font-black text-gray-600 uppercase italic mb-1">PRECIO $</p><input type="number" value={unitPrice} onChange={(e)=>setUnitPrice(e.target.value)} className="w-full bg-transparent text-xl font-black outline-none text-emerald-400 text-center"/></div>
+            </div>
+            <button onClick={addItem} className="w-full bg-emerald-600 py-4 rounded-2xl font-black text-white flex items-center justify-center gap-2 active:scale-95 transition-all text-[10px] uppercase italic shadow-lg shadow-emerald-950/20"><Plus size={16} strokeWidth={4}/> Añadir al Carrito</button>
+          </div>
+
+          <div className="bg-black/50 p-5 rounded-[2rem] border border-white/5 text-center">
+                <p className="text-[9px] font-black text-gray-500 uppercase italic mb-1">Total de Compra</p>
+                <div className="flex justify-center items-end gap-2"><p className="text-4xl font-black text-white italic tracking-tighter">${totalCartUSD.toFixed(2)}</p><button onClick={()=>setTotalCartUSD(0)} className="mb-1 text-red-900 hover:text-red-500"><Trash2 size={16}/></button></div>
+                <p className="text-[14px] font-black text-blue-400 uppercase mt-1 italic tracking-widest bg-blue-400/5 py-1 inline-block px-4 rounded-lg">{(totalCartUSD * parseFloat(exchangeRate)).toLocaleString('es-VE')} BS</p>
+          </div>
+
+          <button onClick={finalizePurchase} disabled={totalCartUSD === 0} className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-[0.3em] active:scale-95 flex items-center justify-center gap-2 text-[10px] italic shadow-xl shadow-white/5"><Save size={16} strokeWidth={3}/> Confirmar y Guardar</button>
+        </div>
+
+        <div className="space-y-3 pb-20">
+          <h2 className="text-[10px] font-black uppercase text-gray-600 tracking-[0.4em] italic px-4">Historial Smart</h2>
+          {history.map((h) => (
+            <div key={h.id} className="bg-[#0a0a0a] p-5 rounded-[2rem] border border-white/5 relative overflow-hidden shadow-lg">
+              <div className={`absolute left-0 top-0 h-full w-1.5 ${h.isCashea ? 'bg-orange-600' : 'bg-emerald-600'}`} />
+              <div className="flex justify-between items-center mb-2">
+                <div>
+                   <p className="text-[8px] font-black text-gray-600 uppercase italic">{h.date} - {h.isCashea ? `${h.initialPercent}% CASHEA` : 'CONTADO'}</p>
+                   <p className="text-2xl font-black text-white italic tracking-tighter">${parseFloat(h.totalUSD).toFixed(2)}</p>
+                   <p className="text-[11px] font-black text-blue-400 uppercase italic">{h.totalBS} BS</p>
+                </div>
+                <div className="text-right">
+                   <p className="text-[8px] font-black text-emerald-500 uppercase italic leading-none">Inicial Pagada</p>
+                   <p className="text-lg font-black italic text-emerald-300">${parseFloat(h.paidUSD).toFixed(2)}</p>
+                   <p className="text-[9px] font-black text-blue-400 uppercase italic">{h.paidBS} BS</p>
+                </div>
+              </div>
+
+              {h.isCashea && (
+                <div className="mt-4 border-t border-white/5 pt-3">
+                   <div className="flex items-center gap-1 mb-2">
+                      <Calendar size={10} className="text-orange-500"/>
+                      <p className="text-[8px] font-black text-gray-500 uppercase italic">Cronograma de Pagos:</p>
+                   </div>
+                   <div className="grid grid-cols-3 gap-2">
+                      {h.cuotasDetalladas.map((c, i) => (
+                        <div key={i} className="bg-orange-500/5 p-2 rounded-xl border border-orange-500/10 text-center">
+                           <p className="text-[7px] font-black text-orange-500 italic mb-1">{c.fecha}</p>
+                           <p className="text-[11px] font-black text-white italic">${c.monto}</p>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
